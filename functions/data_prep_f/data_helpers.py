@@ -5,8 +5,10 @@ This module contains functions for loading, transforming, and engineering featur
 from customer data for machine learning modeling purposes.
 """
 import pandas as pd
+from scipy import stats
+import numpy as np
 
-def load_data_sample(url, n):
+def load_data_sample(url: str, n: int) -> pd.DataFrame:
     """
     Load a random sample of rows from a CSV file for pipeline prototyping.
 
@@ -25,7 +27,7 @@ def load_data_sample(url, n):
     data_sample = pd.read_csv(url).sample(n=n, random_state=42)
     return data_sample
 
-def mutate_payment(data):
+def mutate_payment(data: pd.DataFrame) -> pd.DataFrame:
     """
     Create automatic payment flag and normalize payment method labels.
 
@@ -64,7 +66,7 @@ def mutate_payment(data):
 # TENURE-BASED FEATURES
 # ============================================================================
 
-def mutate_customer_lifetime_buckets(data):
+def mutate_customer_lifetime_buckets(data: pd.DataFrame) -> pd.DataFrame:
     """
     Categorize customer tenure into meaningful lifecycle buckets.
 
@@ -90,7 +92,7 @@ def mutate_customer_lifetime_buckets(data):
     return data
 
 
-def mutate_new_customer_flag(data):
+def mutate_new_customer_flag(data: pd.DataFrame) -> pd.DataFrame:
     """
     Create binary flag identifying newly acquired customers.
 
@@ -115,7 +117,7 @@ def mutate_new_customer_flag(data):
 # VALUE AND PRICING SIGNALS
 # ============================================================================
 
-def mutate_value_gap(data):
+def mutate_value_gap(data: pd.DataFrame) -> pd.DataFrame:
     """
     Calculate pricing discrepancy relative to customer tenure.
 
@@ -149,7 +151,7 @@ def mutate_value_gap(data):
 # SERVICE RICHNESS SIGNALS
 # ============================================================================
 
-def mutate_count_services(data):
+def mutate_count_services(data: pd.DataFrame) -> pd.DataFrame:
     """
     Count the total number of services subscribed by each customer.
 
@@ -186,7 +188,7 @@ def mutate_count_services(data):
     return data
 
 
-def mutate_premium_user_flag(data):
+def mutate_premium_user_flag(data: pd.DataFrame) -> pd.DataFrame:
     """
     Identify high-value customers based on service portfolio depth.
 
@@ -212,4 +214,33 @@ def mutate_premium_user_flag(data):
     """
     # Flag customers with 7+ services as premium users
     data["premium_user_flag"] = (data["count_services"] >= 7).astype(int)
+    return data
+
+def column_transform(data: pd.DataFrame, column: str, transformation: str) -> pd.DataFrame:
+    """
+    Transform a column in the DataFrame, used primarily for plotting choices.
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        The input DataFrame.
+    column : str
+        The column to transform.
+    transformation : str
+        The type of transformation ('log', 'Box-Cox', 'Yeo').
+
+    Returns
+    -------
+    pd.DataFrame
+        The DataFrame with the transformed column.
+    """
+    data = data.copy()
+    if transformation == "log":
+        data[column] = np.log(data[column])
+    elif transformation == "Box-Cox":
+        data[column], _ = stats.boxcox(data[column])
+    elif transformation == "Yeo":
+        data[column], _ = stats.yeojohnson(data[column])
+    else:
+        print(f"No transformation applied: {transformation}")
     return data
