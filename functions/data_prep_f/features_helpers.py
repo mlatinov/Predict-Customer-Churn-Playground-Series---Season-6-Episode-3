@@ -5,8 +5,11 @@ This module provides high-level pipelines that combine multiple feature
 transformations from data_helpers into cohesive feature engineering workflows.
 Three pipelines are available with varying levels of feature coverage.
 """
-
+from sklearn.pipeline import Pipeline
 import pandas as pd
+from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
 
 from functions.data_prep_f.data_helpers import (
     mutate_payment,
@@ -15,6 +18,7 @@ from functions.data_prep_f.data_helpers import (
     mutate_value_gap,
     mutate_count_services,
     mutate_premium_user_flag,
+    mutate_model_clean_data
 )
 
 # ============================================================================
@@ -52,7 +56,11 @@ def tenure_feature_eng(data):
     mutate_customer_lifetime_buckets(data)
     # Flag newly acquired customers for early churn analysis
     mutate_new_customer_flag(data)
+    # Clean the data for modeling 
+    mutate_model_clean_data(data)
+
     return data
+
 
 # ============================================================================
 # VALUE & SERVICE RICHNESS FEATURE ENGINEERING PIPELINE
@@ -94,6 +102,9 @@ def value_x_service_feature_eng(data):
     mutate_count_services(data)
     # Identify high-value customers based on service subscriptions
     mutate_premium_user_flag(data)
+    # Clean the data for modeling 
+    mutate_model_clean_data(data)
+
     return data
 
 
@@ -156,5 +167,96 @@ def full_feature_eng(data):
     mutate_count_services(data)
     # Identify premium/high-value customers by service count threshold
     mutate_premium_user_flag(data)
+     # Clean the data for modeling 
+    mutate_model_clean_data(data)
 
     return data
+
+# =============== Sclearn Features Modeling Pipelines ==========================
+class FeatureEngineeringTransformer(BaseEstimator, TransformerMixin):
+
+    def __init__(
+        self,
+        add_value_x_service_feature_eng = True,
+        add_tenure_feature_eng = True,
+        add_full_feature_eng = True
+        ):
+        self.add_value_x_service_feature_eng = add_value_x_service_feature_eng
+        self.add_tenure_feature_eng = add_tenure_feature_eng
+        self.add_full_feature_eng = add_full_feature_eng
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X) :
+        X = X.copy()
+        X = X.drop(columns=["customerID"], errors="ignore")
+
+        if self.add_value_x_service_feature_eng :
+            value_x_service_feature_eng(X)
+
+        if self.add_tenure_feature_eng :
+            tenure_feature_eng(X)
+
+        if self.add_full_feature_eng :
+            full_feature_eng(X)
+
+        return X
+
+def build_preprocessor(add_tenure=True, add_value_x_service=True, add_full_feature_eng = True) :
+
+    # Base Columns that will be present before the feature adding 
+    num_columns =  ["tenure","MonthlyCharges","TotalCharges"]
+    cat_columns =  [
+        "MultipleLines","InternetService","OnlineSecurity","OnlineBackup","DeviceProtection",
+        "TechSupport","StreamingTV","StreamingMovies","Contract","PaymentMethod"
+    ]
+    # Columns that are 0 and 1 encoded before the feature eng 
+    binary_columns =  ["Partner","Dependents","PhoneService","PaperlessBilling","gender"]
+
+    # Add the new features if any to the columns for the Column Transformer 
+    if add_tenure :
+        cat_columns    += ["customer_lifetime_buckets"]
+        binary_columns += ["automatic_payment", "new_customer_flag"]
+
+    if add_value_x_service :
+        num_columns    += ["value_gap","count_services",]
+        binary_columns += ["automatic_payment","premium_user_flag"]
+
+    if add_full_feature_eng :
+        cat_columns    += ["customer_lifetime_buckets"]
+        num_columns    += ["value_gap", "count_services"]
+        binary_columns += ["automatic_payment", "premium_user_flag", "new_customer_flag"]
+
+    # Build a preprocessor 
+    preprocessor = ColumnTransformer(
+        transformers= [
+            ("numerical", StandardScaler(), num_columns),
+            ("cateogorical", OneHotEncoder(handle_unknown="ignore"), cat_columns),
+            ("binary","passthrough", binary_columns)
+        ]
+    )
+    return preprocessor
+
+def build_pipeline(model, add_tenure = True, add_value_x_service = True, add_full_feature = True) :
+
+    # Pipeline combiners the added features from the Transformer preprocesing from the preprocessor and Model 
+    pipeline = Pipeline(steps= [
+        ("feature_eng", FeatureEngineeringTransformer(
+            add_tenure_features = add_tenure,
+            add_full_feature_eng   = add_full_feature,
+            add_value_x_service = add_value_x_service
+        )),
+        ("preprocesing" , build_preprocessor(
+            add_tenure           = add_tenure,
+            add_value_x_service  = add_value_x_service,
+            add_full_feature_eng = add_full_feature
+        )),
+        ("model" , model)
+        ]
+    )
+    return pipeline
+
+data = pd.read_csv("sample_data/train.csv").sample(1000)
+
+   

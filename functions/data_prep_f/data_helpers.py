@@ -216,6 +216,17 @@ def mutate_premium_user_flag(data: pd.DataFrame) -> pd.DataFrame:
     data["premium_user_flag"] = (data["count_services"] >= 7).astype(int)
     return data
 
+def mutate_model_clean_data(data) : 
+    """
+    Function to clean and transform the the data for modeling 
+    """
+    # Columns that are Yes and No encoded 
+    columns = ["Partner","Dependents","PhoneService","PaperlessBilling"]
+    data[columns] = data[columns].apply(lambda col : col.map({"Yes" : 1, "No" : 0}))
+    # Mutate Gender as 0 : Female and 1 : Male
+    data["gender"] = data["gender"].replace({"Female" : 0, "Male" : 1},inplace = True)
+    return data
+
 def column_transform(data: pd.DataFrame, column: str, transformation: str) -> pd.DataFrame:
     """
     Transform a column in the DataFrame, used primarily for plotting choices.
