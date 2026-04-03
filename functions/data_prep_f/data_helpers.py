@@ -4,7 +4,6 @@ Data preparation and feature engineering utilities for customer churn prediction
 This module contains functions for loading, transforming, and engineering features
 from customer data for machine learning modeling purposes.
 """
-from matplotlib.pyplot import axis
 import pandas as pd
 from scipy import stats
 import numpy as np
@@ -254,7 +253,8 @@ def mutate_model_clean_data(data) :
     # Mutate Gender as 0 : Female and 1 : Male
     data["gender"] = data["gender"].replace({"Female" : 0, "Male" : 1})
     # Mutate Churn to be 0 and 1 
-    data["Churn"] = data["Churn"].replace({"Yes" : 1, "No" : 0})
+    if "Churn" in data.columns:
+        data["Churn"] = data["Churn"].replace({"Yes": 1, "No": 0})
     return data
 
 def column_transform(data: pd.DataFrame, column: str, transformation: str) -> pd.DataFrame:
