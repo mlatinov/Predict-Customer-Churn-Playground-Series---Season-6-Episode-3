@@ -4,9 +4,11 @@ Data preparation and feature engineering utilities for customer churn prediction
 This module contains functions for loading, transforming, and engineering features
 from customer data for machine learning modeling purposes.
 """
+from matplotlib.pyplot import axis
 import pandas as pd
 from scipy import stats
 import numpy as np
+from sklearn.model_selection import train_test_split
 
 def load_data_sample(url: str, n: int) -> pd.DataFrame:
     """
@@ -26,6 +28,32 @@ def load_data_sample(url: str, n: int) -> pd.DataFrame:
     """
     data_sample = pd.read_csv(url).sample(n=n, random_state=42)
     return data_sample
+
+def data_split(train_url, train_size, test_size) : 
+    """
+    Function to take data paths and return a X_train Y_train X_test, Y_test
+    """
+    # Load the data 
+    train_data = pd.read_csv(train_url)
+    X = train_data.drop("Churn",axis = 1)
+    y = train_data["Churn"]
+
+    # Split the data with sklearn 
+    X_train, X_test, y_train, y_test = train_test_split(
+        X,
+        y,
+        random_state=42,
+        test_size=test_size,
+        train_size=train_size
+    )
+    data_splits = {
+        "x_train" : X_train,
+        "y_train" : y_train,
+        "x_test"  : X_test,
+        "y_test"  : y_test
+    }
+    
+    return data_splits
 
 def mutate_payment(data: pd.DataFrame) -> pd.DataFrame:
     """
@@ -86,7 +114,7 @@ def mutate_customer_lifetime_buckets(data: pd.DataFrame) -> pd.DataFrame:
     # Bin tenure into meaningful customer lifecycle segments
     data["customer_lifetime_buckets"] = pd.cut(
         data["tenure"],
-        bins=[0, 5, 10, 20, 40, 60],
+        bins=[-1, 5, 10, 20, 40, float("inf")],
         labels=["0-5", "5-10", "10-20", "20-40", "60+"]
     )
     return data
@@ -224,7 +252,9 @@ def mutate_model_clean_data(data) :
     columns = ["Partner","Dependents","PhoneService","PaperlessBilling"]
     data[columns] = data[columns].apply(lambda col : col.map({"Yes" : 1, "No" : 0}))
     # Mutate Gender as 0 : Female and 1 : Male
-    data["gender"] = data["gender"].replace({"Female" : 0, "Male" : 1},inplace = True)
+    data["gender"] = data["gender"].replace({"Female" : 0, "Male" : 1})
+    # Mutate Churn to be 0 and 1 
+    data["Churn"] = data["Churn"].replace({"Yes" : 1, "No" : 0})
     return data
 
 def column_transform(data: pd.DataFrame, column: str, transformation: str) -> pd.DataFrame:

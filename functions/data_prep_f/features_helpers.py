@@ -51,13 +51,13 @@ def tenure_feature_eng(data):
     This pipeline modifies the input DataFrame in place and returns it.
     """
     # Extract payment automation pattern
-    mutate_payment(data)
+    data = mutate_payment(data)
     # Segment customers into tenure-based lifecycle groups
-    mutate_customer_lifetime_buckets(data)
+    data = mutate_customer_lifetime_buckets(data)
     # Flag newly acquired customers for early churn analysis
-    mutate_new_customer_flag(data)
+    data = mutate_new_customer_flag(data)
     # Clean the data for modeling 
-    mutate_model_clean_data(data)
+    data = mutate_model_clean_data(data)
 
     return data
 
@@ -95,15 +95,15 @@ def value_x_service_feature_eng(data):
     Focuses on monetization and engagement signals rather than tenure stages.
     """
     # Extract payment automation pattern
-    mutate_payment(data)
+    data = mutate_payment(data)
     # Calculate pricing signals based on tenure and monthly charges
-    mutate_value_gap(data)
+    data = mutate_value_gap(data)
     # Count service portfolio depth
-    mutate_count_services(data)
+    data = mutate_count_services(data)
     # Identify high-value customers based on service subscriptions
-    mutate_premium_user_flag(data)
+    data = mutate_premium_user_flag(data)
     # Clean the data for modeling 
-    mutate_model_clean_data(data)
+    data = mutate_model_clean_data(data)
 
     return data
 
@@ -150,25 +150,25 @@ def full_feature_eng(data):
     """
     # PAYMENT FEATURES
     # Extract payment automation pattern as a binary signal
-    mutate_payment(data)
+    data = mutate_payment(data)
 
     # TENURE-BASED FEATURES
     # Segment customers into lifecycle stages based on tenure history
-    mutate_customer_lifetime_buckets(data)
+    data = mutate_customer_lifetime_buckets(data)
     # Flag newly acquired customers within first 6 months
-    mutate_new_customer_flag(data)
+    data = mutate_new_customer_flag(data)
 
     # VALUE & PRICING FEATURES
     # Calculate pricing signals relative to customer tenure
-    mutate_value_gap(data)
+    data = mutate_value_gap(data)
 
     # SERVICE RICHNESS FEATURES
     # Aggregate total service portfolio depth for engagement analysis
-    mutate_count_services(data)
+    data = mutate_count_services(data)
     # Identify premium/high-value customers by service count threshold
-    mutate_premium_user_flag(data)
+    data = mutate_premium_user_flag(data)
      # Clean the data for modeling 
-    mutate_model_clean_data(data)
+    data = mutate_model_clean_data(data)
 
     return data
 
@@ -184,22 +184,26 @@ class FeatureEngineeringTransformer(BaseEstimator, TransformerMixin):
         self.add_value_x_service_feature_eng = add_value_x_service_feature_eng
         self.add_tenure_feature_eng = add_tenure_feature_eng
         self.add_full_feature_eng = add_full_feature_eng
-
+     
     def fit(self, X, y=None):
         return self
 
     def transform(self, X) :
         X = X.copy()
-        X = X.drop(columns=["customerID"], errors="ignore")
+        X = X.drop(columns=["customerID", "id"], errors="ignore") 
 
+            
         if self.add_value_x_service_feature_eng :
-            value_x_service_feature_eng(X)
+            X = value_x_service_feature_eng(X)
 
-        if self.add_tenure_feature_eng :
-            tenure_feature_eng(X)
+        elif self.add_tenure_feature_eng :
+            X = tenure_feature_eng(X)
 
-        if self.add_full_feature_eng :
-            full_feature_eng(X)
+        elif self.add_full_feature_eng :
+            X = full_feature_eng(X)
+
+        else : 
+            X = mutate_model_clean_data(X)
 
         return X
 
@@ -212,7 +216,7 @@ def build_preprocessor(add_tenure=True, add_value_x_service=True, add_full_featu
         "TechSupport","StreamingTV","StreamingMovies","Contract","PaymentMethod"
     ]
     # Columns that are 0 and 1 encoded before the feature eng 
-    binary_columns =  ["Partner","Dependents","PhoneService","PaperlessBilling","gender"]
+    binary_columns =  ["Partner","Dependents","PhoneService","PaperlessBilling","gender","SeniorCitizen"]
 
     # Add the new features if any to the columns for the Column Transformer 
     if add_tenure :
@@ -243,9 +247,9 @@ def build_pipeline(model, add_tenure = True, add_value_x_service = True, add_ful
     # Pipeline combiners the added features from the Transformer preprocesing from the preprocessor and Model 
     pipeline = Pipeline(steps= [
         ("feature_eng", FeatureEngineeringTransformer(
-            add_tenure_features = add_tenure,
-            add_full_feature_eng   = add_full_feature,
-            add_value_x_service = add_value_x_service
+            add_tenure_feature_eng            = add_tenure,
+            add_full_feature_eng              = add_full_feature,
+            add_value_x_service_feature_eng   = add_value_x_service
         )),
         ("preprocesing" , build_preprocessor(
             add_tenure           = add_tenure,
@@ -256,7 +260,3 @@ def build_pipeline(model, add_tenure = True, add_value_x_service = True, add_ful
         ]
     )
     return pipeline
-
-data = pd.read_csv("sample_data/train.csv").sample(1000)
-
-   
