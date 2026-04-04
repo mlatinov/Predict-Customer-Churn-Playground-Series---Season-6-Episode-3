@@ -6,11 +6,10 @@ transformations from data_helpers into cohesive feature engineering workflows.
 Three pipelines are available with varying levels of feature coverage.
 """
 from sklearn.pipeline import Pipeline
-import pandas as pd
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
-
+import numpy as np 
 from functions.data_prep_f.data_helpers import (
     mutate_payment,
     mutate_customer_lifetime_buckets,
@@ -186,26 +185,36 @@ class FeatureEngineeringTransformer(BaseEstimator, TransformerMixin):
         self.add_full_feature_eng = add_full_feature_eng
      
     def fit(self, X, y=None):
+        self.feature_names_in_ = list(X.columns)
         return self
 
+        # Appliing the transformation funstions 
     def transform(self, X) :
         X = X.copy()
         X = X.drop(columns=["customerID", "id"], errors="ignore") 
 
-            
         if self.add_value_x_service_feature_eng :
             X = value_x_service_feature_eng(X)
 
-        elif self.add_tenure_feature_eng :
+        if self.add_tenure_feature_eng :
             X = tenure_feature_eng(X)
 
-        elif self.add_full_feature_eng :
+        if self.add_full_feature_eng :
             X = full_feature_eng(X)
 
-        else : 
+        if not any([
+            self.add_value_x_service_feature_eng,
+            self.add_tenure_feature_eng,
+            self.add_full_feature_eng
+        ]):
             X = mutate_model_clean_data(X)
-
+        
+        self.feature_names_out_ = list(X.columns)
         return X
+
+        # Method to allow the pipeline to work with Dalex
+    def get_feature_names_out(self, input_features=None):
+        return np.array(self.feature_names_out_)
 
 def build_preprocessor(add_tenure=True, add_value_x_service=True, add_full_feature_eng = True) :
 
@@ -236,10 +245,12 @@ def build_preprocessor(add_tenure=True, add_value_x_service=True, add_full_featu
     preprocessor = ColumnTransformer(
         transformers= [
             ("numerical", StandardScaler(), num_columns),
-            ("cateogorical", OneHotEncoder(handle_unknown="ignore"), cat_columns),
+            ("cateogorical", OneHotEncoder(handle_unknown="ignore",sparse_output=False) , cat_columns),
             ("binary","passthrough", binary_columns)
-        ]
+        ],
+        verbose_feature_names_out=False
     )
+    preprocessor.set_output(transform="pandas")
     return preprocessor
 
 def build_pipeline(model, add_tenure = True, add_value_x_service = True, add_full_feature = True) :
@@ -260,3 +271,5 @@ def build_pipeline(model, add_tenure = True, add_value_x_service = True, add_ful
         ]
     )
     return pipeline
+
+
