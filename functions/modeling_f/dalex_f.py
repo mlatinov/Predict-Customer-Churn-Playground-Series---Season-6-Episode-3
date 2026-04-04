@@ -1,0 +1,203 @@
+
+from sklearn.pipeline import Pipeline
+import dalex as dx 
+import mlflow
+import tempfile
+import os
+
+def dx_transform(pipeline, x_train, y_train) : 
+    """
+    Function to Prepare and Transform the data for Dalex 
+    """
+    # Clean the target before the preproc to avoid erros lates in Dalex 
+    if y_train.dtype == object:
+        y_train = (y_train == "Yes").astype(int)
+
+    # Split at the model boundary
+    transformer_steps = Pipeline(pipeline.steps[: -1])
+    model_only = pipeline.steps[-1][1]
+
+    # Transform the data 
+    X_transformed = transformer_steps.transform(x_train)
+
+    results = {
+        "model"    : model_only,
+        "dalex_df" : X_transformed,
+        "y_encoded" : y_train
+    }
+    return results
+
+
+def dx_create_explainer(pipeline, x_train, y_train, label) :
+    """
+    Function to Create DALEX Explainer from custom Sklean Pipeline 
+    """
+    # Transform the data from the pipeline 
+    dx_transformed = dx_transform(
+        pipeline = pipeline,
+        x_train = x_train,
+        y_train = y_train
+    )
+    # Create Dalex Explainer 
+    dx_explainer = dx.Explainer(
+        model = dx_transformed["model"],
+        data = dx_transformed["dalex_df"],
+        y = dx_transformed["y_encoded"],
+        label= label,
+        verbose= False
+    ) 
+    return dx_explainer
+
+# ====================== Global Feature Importance ========================================
+def dx_loss_shuffle_imp(dalex_explainer):
+    """
+    Function to Compute and Return Shuffle Loss Model Features Importance
+    """
+    # Compute importance
+    imp = dalex_explainer.model_parts(loss_function="1-auc")
+
+    # Extract results
+    key_features = imp.result
+
+    # Remove baseline BEFORE sorting
+    key_features = key_features[key_features["variable"] != "_baseline_"]
+
+    top_5 = (
+        key_features
+        .sort_values(by="dropout_loss", ascending=False)
+        .head(5)
+        .variable
+    )
+    results = {
+        "Top_5_Features": top_5,
+        "Loss_Shuffle_Importance_cv": key_features,
+        "Importance": imp
+    }
+    return results
+
+def dx_profiles(dalex_explainer, features_names, type = "partial", groups = None ) :
+
+    # Compute the Partial Dependency Profile / ALE 
+    profile = dalex_explainer.model_profile(
+        type= type,
+        variables= features_names,
+        N = 500,
+        groups= groups
+    )
+    # Take the results CV
+    results_cv = profile.result
+
+    results = {
+        "PDP_cv"   : results_cv,
+        "PDP_plot" : profile
+    }
+    return results
+
+def dx_rcdr(dalex_explainer) :
+    # Compute the Global residuals 
+    mp = dalex_explainer.model_performance()
+
+    return mp
+
+def dx_global_importance(dalex_explainer, features_names, groups = None) :
+
+    # Run Shuffle Importance with 1 - AUC as a loss function 
+    features_imp = dx_loss_shuffle_imp(dalex_explainer)
+
+    # Run PDP or ALE 
+    partial_profiles = dx_profiles(dalex_explainer, features_names)
+
+    # Run Reverse Cumulative Distribution of Residuals 
+    rcdr = dx_rcdr(dalex_explainer)
+
+    results = {
+        "Top_5_Features": features_imp["Top_5_Features"],
+        "Loss_Shuffle_Importance_cv": features_imp["Loss_Shuffle_Importance_cv"],
+        "Loss_Shuffle_Plot": features_imp["Importance"],
+        "PDP_Plot" : partial_profiles["PDP_plot"],
+        "RCDR_Plot" : rcdr
+
+    }
+    return results
+# ======================  INSTANCE LEVEL EXPLANATIONS =======================
+def dx_build_profiles(pipeline, x_train, y_train) :
+    """
+    Function to Build Profiles for local explanations using random sample of each 0 and 1 
+    """
+    # Take a Random Sample 
+    profile_1_raw = x_train[y_train == "Yes"].sample(n = 1,random_state = 42)
+    profile_2_raw = x_train[y_train == "No"].sample(n = 1,random_state = 42)
+    # Transform the Sample with the pipeline 
+    profile_1 = dx_transform(pipeline = pipeline, x_train = profile_1_raw, y_train = y_train)["dalex_df"]
+    profile_2 = dx_transform(pipeline = pipeline, x_train = profile_2_raw, y_train = y_train)["dalex_df"]
+
+    profiles = {
+        "profile_yes" : profile_1,
+        "profile_no"  : profile_2
+    }
+    return profiles
+
+def dx_bd(dalex_explainer, profiles) :
+    """
+    Function to run Break Down Analysis on the Profiles
+    """
+    # Break down the profiles 
+    bd_profile_1 = dalex_explainer.predict_parts(new_observation= profiles["profile_yes"],type = "break_down")
+    bd_profile_2 = dalex_explainer.predict_parts(new_observation= profiles["profile_no"],type = "break_down")
+    results = {
+        "bd_plot_1" : bd_profile_1,
+        "bd_plot_2" : bd_profile_2
+    }
+    return results
+
+def dx_cp(dalex_explainer, profiles, features) :
+    """
+    Function to run Ceratus Paribus Analysis on the Profiles 
+    """
+    # Ceratus Paribus (What if analysis)
+    cp_profile_1 = dalex_explainer.predict_profile(
+        new_observation=profiles["profile_yes"],
+        type="ceteris_paribus",
+        variables = features
+    )
+    cp_profile_2 = dalex_explainer.predict_profile(
+        new_observation=profiles["profile_yes"],
+        type="ceteris_paribus",
+        variables = features
+    )
+    results = {
+        "cp_plot_1" : cp_profile_1,
+        "cp_plot_2" : cp_profile_2
+    }
+    return results
+
+def dx_local_explanations(dalex_explainer, pipeline, features_names, x_train, y_train) :
+
+    # Build Profiles from the data 
+    profiles = dx_build_profiles(pipeline, x_train, y_train)
+
+    # Run Break Down Analysis 
+    bd = dx_bd(dalex_explainer, profiles)
+
+    # Run Ceretis Paribus Analysis 
+    cp = dx_cp(dalex_explainer, profiles, features = features_names)
+
+    results = {
+        "bd_plot_1" : bd["bd_plot_1"],
+        "bd_plot_2" : bd["bd_plot_2"],
+        "cp_plot_1" : cp["cp_plot_1"],
+        "cp_plot_2" : cp["cp_plot_2"]
+    }
+    return results
+    
+def mlflow_log_dalex_plot(dalex_result, filename, artifact_path="dalex"):
+    """
+    DALEX .plot() returns a plotly figure — save it as HTML
+    so it stays interactive in the MLflow UI
+    """
+    fig = dalex_result.plot(show=False)   
+
+    with tempfile.TemporaryDirectory() as tmp:
+        filepath = os.path.join(tmp, filename)
+        fig.write_html(filepath)
+        mlflow.log_artifact(filepath, artifact_path=artifact_path)
