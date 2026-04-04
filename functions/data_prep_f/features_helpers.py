@@ -31,23 +31,7 @@ def tenure_feature_eng(data):
     Applies a focused feature engineering pipeline that extracts payment patterns
     and segments customers by tenure. Ideal for analyzing customer lifecycle
     stages and churn patterns across different tenure groups.
-
-    Parameters
-    ----------
-    data : pd.DataFrame
-        Raw customer data with PaymentMethod and tenure columns.
-
-    Returns
-    -------
-    pd.DataFrame
-        Enriched DataFrame with features:
-        - automatic_payment: Binary flag for automatic payments
-        - customer_lifetime_buckets: Tenure segmentation (0-5, 5-10, 10-20, 20-40, 60+)
-        - new_customer_flag: Binary flag for customers with <=6 months tenure
-
-    Notes
-    -----
-    This pipeline modifies the input DataFrame in place and returns it.
+    
     """
     # Extract payment automation pattern
     data = mutate_payment(data)
@@ -73,25 +57,6 @@ def value_x_service_feature_eng(data):
     metrics and service portfolio depth. Ideal for understanding customer
     engagement levels, monetization patterns, and high-value customer identification.
 
-    Parameters
-    ----------
-    data : pd.DataFrame
-        Raw customer data with PaymentMethod, MonthlyCharges, tenure, and
-        service columns.
-
-    Returns
-    -------
-    pd.DataFrame
-        Enriched DataFrame with features:
-        - automatic_payment: Binary flag for automatic payments
-        - value_gap: Pricing discrepancy relative to tenure
-        - count_services: Total number of services subscribed (0-9)
-        - premium_user_flag: Binary flag for customers with 7+ services
-
-    Notes
-    -----
-    This pipeline modifies the input DataFrame in place and returns it.
-    Focuses on monetization and engagement signals rather than tenure stages.
     """
     # Extract payment automation pattern
     data = mutate_payment(data)
@@ -116,36 +81,8 @@ def full_feature_eng(data):
     Create comprehensive feature set combining tenure, value, and service metrics.
 
     Applies the complete feature engineering pipeline, integrating all available
-    transformations for maximum feature coverage. Ideal for exploratory analysis
-    and comprehensive model training with all available signals.
+    transformations for maximum feature coverage. 
 
-    Parameters
-    ----------
-    data : pd.DataFrame
-        Raw customer data with all required columns: PaymentMethod, tenure,
-        MonthlyCharges, and service subscription columns.
-
-    Returns
-    -------
-    pd.DataFrame
-        Enriched DataFrame with all engineered features:
-        - automatic_payment: Binary flag for automatic payments
-        - customer_lifetime_buckets: Tenure segmentation (0-5, 5-10, 10-20, 20-40, 60+)
-        - new_customer_flag: Binary flag for customers with <=6 months tenure
-        - value_gap: Pricing discrepancy relative to tenure
-        - count_services: Total number of services subscribed (0-9)
-        - premium_user_flag: Binary flag for customers with 7+ services
-
-    Notes
-    -----
-    This pipeline modifies the input DataFrame in place and returns it.
-    Combines all three feature engineering pipelines for comprehensive modeling.
-    This may result in higher dimensionality but provides all available signals.
-
-    Examples
-    --------
-    >>> df = pd.read_csv('customer_data.csv')
-    >>> df_engineered = full_feature_eng(df)
     """
     # PAYMENT FEATURES
     # Extract payment automation pattern as a binary signal
@@ -180,6 +117,13 @@ class FeatureEngineeringTransformer(BaseEstimator, TransformerMixin):
         add_tenure_feature_eng = True,
         add_full_feature_eng = True
         ):
+        """
+        Initialize the FeatureEngineeringTransformer.
+
+        Controls which feature engineering pipelines are applied during the
+        transform step. Flags can be combined, but enabling add_full_feature_eng
+        already includes all tenure and value-x-service features.
+        """
         self.add_value_x_service_feature_eng = add_value_x_service_feature_eng
         self.add_tenure_feature_eng = add_tenure_feature_eng
         self.add_full_feature_eng = add_full_feature_eng
@@ -190,6 +134,18 @@ class FeatureEngineeringTransformer(BaseEstimator, TransformerMixin):
 
         # Appliing the transformation funstions 
     def transform(self, X) :
+        """
+        Apply the configured feature engineering pipelines to the input data.
+        Drops identifier columns (customerID, id) and applies the selected
+        feature engineering pipelines based on the flags set at initialization.
+        If all flags are False, only the base model-clean transformation is applied.
+        
+        Notes
+        -----
+        The input DataFrame is copied before transformation to avoid mutating
+        the original data. Multiple flags can be True simultaneously, which
+        will result in duplicate engineered columns being added.
+        """
         X = X.copy()
         X = X.drop(columns=["customerID", "id"], errors="ignore") 
 
@@ -214,10 +170,28 @@ class FeatureEngineeringTransformer(BaseEstimator, TransformerMixin):
 
         # Method to allow the pipeline to work with Dalex
     def get_feature_names_out(self, input_features=None):
+        """
+        Return the names of the output features after transformation.
+        
+        Provides sklearn API compatibility so that downstream steps in a
+        Pipeline (e.g., ColumnTransformer) can retrieve feature names
+        programmatically. Requires that transform() has been called first.
+
+        """
         return np.array(self.feature_names_out_)
 
 def build_preprocessor(add_tenure=True, add_value_x_service=True, add_full_feature_eng = True) :
+    """
+    Build an sklearn ColumnTransformer for numerical, categorical, and binary features.
+    
+    The column lists are expanded dynamically based on which feature engineering pipelines
+    are active, so the preprocessor must match the flags passed to FeatureEngineeringTransformer.
 
+    Notes
+    -----
+    The flags passed here must mirror those passed to FeatureEngineeringTransformer
+    to ensure the expected columns are present at preprocessing time.
+    """
     # Base Columns that will be present before the feature adding 
     num_columns =  ["tenure","MonthlyCharges","TotalCharges"]
     cat_columns =  [
@@ -254,7 +228,20 @@ def build_preprocessor(add_tenure=True, add_value_x_service=True, add_full_featu
     return preprocessor
 
 def build_pipeline(model, add_tenure = True, add_value_x_service = True, add_full_feature = True) :
+    """
+    Assemble a full sklearn Pipeline combining feature engineering, preprocessing, and a model.
 
+    Creates a three-step Pipeline that sequentially applies:
+    1. FeatureEngineeringTransformer – generates domain-specific features.
+    2. build_preprocessor – scales numerical, encodes categorical, and passes binary columns.
+    3. The supplied estimator – fits or predicts on the preprocessed data.
+
+    Examples
+    --------
+    >>> from sklearn.linear_model import LogisticRegression
+    >>> pipeline = build_pipeline(LogisticRegression(), add_tenure=True, add_value_x_service=False)
+    >>> pipeline.fit(X_train, y_train)
+    """
     # Pipeline combiners the added features from the Transformer preprocesing from the preprocessor and Model 
     pipeline = Pipeline(steps= [
         ("feature_eng", FeatureEngineeringTransformer(

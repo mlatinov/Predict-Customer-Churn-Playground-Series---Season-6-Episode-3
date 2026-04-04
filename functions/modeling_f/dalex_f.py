@@ -7,7 +7,12 @@ import os
 
 def dx_transform(pipeline, x_train, y_train) : 
     """
-    Function to Prepare and Transform the data for Dalex 
+    Prepare and transform data for use with a DALEX Explainer.
+
+    Strips the model estimator from the pipeline and applies only the
+    preprocessing steps to produce the transformed feature matrix expected
+    by DALEX. Also encodes the target variable from string ('Yes'/'No') to
+    integer (1/0) if necessary.
     """
     # Clean the target before the preproc to avoid erros lates in Dalex 
     if y_train.dtype == object:
@@ -30,7 +35,10 @@ def dx_transform(pipeline, x_train, y_train) :
 
 def dx_create_explainer(pipeline, x_train, y_train, label) :
     """
-    Function to Create DALEX Explainer from custom Sklean Pipeline 
+    Create a DALEX Explainer from a fitted sklearn Pipeline.
+
+    Extracts the model and preprocessed data from the pipeline via
+    dx_transform(), then instantiates a dalex.
     """
     # Transform the data from the pipeline 
     dx_transformed = dx_transform(
@@ -76,7 +84,11 @@ def dx_loss_shuffle_imp(dalex_explainer):
     return results
 
 def dx_profiles(dalex_explainer, features_names, type = "partial", groups = None ) :
-
+    """
+    Compute Partial Dependency Profiles (PDP) or Accumulated Local Effects (ALE).
+    Runs DALEX model_profile on the specified features using a sample of 500
+    observations. 
+    """
     # Compute the Partial Dependency Profile / ALE 
     profile = dalex_explainer.model_profile(
         type= type,
@@ -94,13 +106,24 @@ def dx_profiles(dalex_explainer, features_names, type = "partial", groups = None
     return results
 
 def dx_rcdr(dalex_explainer) :
+    """
+    Compute the Reverse Cumulative Distribution of Residuals (RCDR)
+    """
     # Compute the Global residuals 
     mp = dalex_explainer.model_performance()
 
     return mp
 
 def dx_global_importance(dalex_explainer, features_names, groups = None) :
+    """
+    Compute a comprehensive set of global model explanations.
 
+    Combines three complementary global explanation techniques:
+    - Permutation-based (Shuffle Loss) feature importance using 1-AUC as the loss function.
+    - Partial Dependency Profiles (PDP) for the specified features.
+    - Reverse Cumulative Distribution of Residuals (RCDR) for model performance
+      diagnostics.
+    """
     # Run Shuffle Importance with 1 - AUC as a loss function 
     features_imp = dx_loss_shuffle_imp(dalex_explainer)
 
@@ -119,10 +142,15 @@ def dx_global_importance(dalex_explainer, features_names, groups = None) :
 
     }
     return results
+
 # ======================  INSTANCE LEVEL EXPLANATIONS =======================
 def dx_build_profiles(pipeline, x_train, y_train) :
     """
-    Function to Build Profiles for local explanations using random sample of each 0 and 1 
+    Build transformed observation profiles for local explanation analysis.
+
+    Randomly samples one churned customer (Churn='Yes') and one non-churned
+    customer (Churn='No') from the training set, then applies the pipeline's
+    preprocessing steps to produce DALEX-compatible feature vectors.
     """
     # Take a Random Sample 
     profile_1_raw = x_train[y_train == "Yes"].sample(n = 1,random_state = 42)
@@ -139,7 +167,7 @@ def dx_build_profiles(pipeline, x_train, y_train) :
 
 def dx_bd(dalex_explainer, profiles) :
     """
-    Function to run Break Down Analysis on the Profiles
+    Run Break Down attribution analysis on churned and non-churned profiles.
     """
     # Break down the profiles 
     bd_profile_1 = dalex_explainer.predict_parts(new_observation= profiles["profile_yes"],type = "break_down")
@@ -152,7 +180,7 @@ def dx_bd(dalex_explainer, profiles) :
 
 def dx_cp(dalex_explainer, profiles, features) :
     """
-    Function to run Ceratus Paribus Analysis on the Profiles 
+    Run Ceteris Paribus (what-if) analysis on churned and non-churned profiles.
     """
     # Ceratus Paribus (What if analysis)
     cp_profile_1 = dalex_explainer.predict_profile(
@@ -172,7 +200,14 @@ def dx_cp(dalex_explainer, profiles, features) :
     return results
 
 def dx_local_explanations(dalex_explainer, pipeline, features_names, x_train, y_train) :
+    """
+    Generate instance-level explanations for representative churned and non-churned customers.
 
+    Orchestrates the full local explanation workflow: samples representative
+    observations via dx_build_profiles, computes Break Down attributions via
+    dx_bd, and computes Ceteris Paribus profiles via dx_cp for both the churned
+    and non-churned observations.
+    """
     # Build Profiles from the data 
     profiles = dx_build_profiles(pipeline, x_train, y_train)
 
@@ -192,8 +227,7 @@ def dx_local_explanations(dalex_explainer, pipeline, features_names, x_train, y_
     
 def mlflow_log_dalex_plot(dalex_result, filename, artifact_path="dalex"):
     """
-    DALEX .plot() returns a plotly figure — save it as HTML
-    so it stays interactive in the MLflow UI
+    Save a DALEX plot as an interactive HTML artifact and log it to MLflow.
     """
     fig = dalex_result.plot(show=False)   
 

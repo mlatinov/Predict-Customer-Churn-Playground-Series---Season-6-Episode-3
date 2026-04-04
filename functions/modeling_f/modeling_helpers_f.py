@@ -7,6 +7,14 @@ from sklearn.metrics import (
 import matplotlib.pyplot as plt
 
 def model_predict(model, model_data):
+    """
+    Generate class predictions and probability scores for train and test sets.
+
+    Runs model.predict and model.predict_proba on both the training and test
+    splits stored in model_data. The positive-class probability (index 1) is
+    extracted for use in AUC evaluation.
+
+    """
     # Train predictions
     y_train_pred = model.predict(model_data["x_train"])
     y_train_pred_prob = model.predict_proba(model_data["x_train"])[:, 1]
@@ -24,7 +32,13 @@ def model_predict(model, model_data):
     return predictions
 
 def evaluate_model(model, predictions, model_data) :
+    """
+    Compute AUC and accuracy metrics for train and test sets, including bias.
 
+    Calculates ROC-AUC and accuracy on both splits and derives the train-test
+    bias (overfitting signal) as the difference between train and test scores.
+    All values are rounded to three decimal places.
+    """
     # Evaluate the model 
     train_auc = roc_auc_score(model_data["y_train"],predictions["y_train_pred_prob"])
     test_auc  = roc_auc_score(model_data["y_test"], predictions["y_test_pred_prob"])
@@ -44,7 +58,13 @@ def evaluate_model(model, predictions, model_data) :
 
 def confusion_matrix(predictions, model_data) : 
     """
-    Function to plot and save a Confusion Matrix Used for Model Logs 
+    Plot a normalized confusion matrix for the test set.
+
+    Renders a row-normalized confusion matrix using sklearn's
+    ConfusionMatrixDisplay with class labels ['No', 'Yes'] and a blue
+    color map. The resulting figure is intended for logging to MLflow
+    or other experiment tracking systems.
+    
     """
     fig, ax = plt.subplots()
     ConfusionMatrixDisplay.from_predictions(
