@@ -5,6 +5,8 @@ This module provides high-level pipelines that combine multiple feature
 transformations from data_helpers into cohesive feature engineering workflows.
 Three pipelines are available with varying levels of feature coverage.
 """
+from sklearn.feature_selection import VarianceThreshold
+from sklearn.preprocessing import PowerTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.compose import ColumnTransformer
@@ -31,7 +33,7 @@ def tenure_feature_eng(data):
     Applies a focused feature engineering pipeline that extracts payment patterns
     and segments customers by tenure. Ideal for analyzing customer lifecycle
     stages and churn patterns across different tenure groups.
-    
+
     """
     # Extract payment automation pattern
     data = mutate_payment(data)
@@ -43,7 +45,6 @@ def tenure_feature_eng(data):
     data = mutate_model_clean_data(data)
 
     return data
-
 
 # ============================================================================
 # VALUE & SERVICE RICHNESS FEATURE ENGINEERING PIPELINE
@@ -71,7 +72,6 @@ def value_x_service_feature_eng(data):
 
     return data
 
-
 # ============================================================================
 # COMPREHENSIVE FEATURE ENGINEERING PIPELINE
 # ============================================================================
@@ -82,8 +82,8 @@ def full_feature_eng(data):
 
     Applies the complete feature engineering pipeline, integrating all available
     transformations for maximum feature coverage. 
-
     """
+    
     # PAYMENT FEATURES
     # Extract payment automation pattern as a binary signal
     data = mutate_payment(data)
@@ -180,7 +180,13 @@ class FeatureEngineeringTransformer(BaseEstimator, TransformerMixin):
         """
         return np.array(self.feature_names_out_)
 
-def build_preprocessor(add_tenure=True, add_value_x_service=True, add_full_feature_eng = True) :
+def build_preprocessor(
+    add_tenure=True,
+    add_value_x_service=True,
+    add_full_feature_eng = True,
+    add_power_transform = False,
+    add_remove_nzv = False
+    ) :
     """
     Build an sklearn ColumnTransformer for numerical, categorical, and binary features.
     
@@ -215,10 +221,31 @@ def build_preprocessor(add_tenure=True, add_value_x_service=True, add_full_featu
         num_columns    += ["value_gap", "count_services"]
         binary_columns += ["automatic_payment", "premium_user_flag", "new_customer_flag"]
 
-    # Build a preprocessor 
+    # Build a numerical preproc Step by step
+    numerical_steps = []
+
+    # Remove near Zero variance Features 
+    if add_remove_nzv :
+        numerical_steps.append(
+            ("nzv", VarianceThreshold(threshold=0.01))
+        )
+
+    # Apply Power Transformation Yeo-Johnson
+    if add_power_transform :
+        numerical_steps.append(
+            ("yeo", PowerTransformer(method="yeo-johnson",standardize= False)),
+        ) 
+    
+    # Scale all the numerical Features 
+    numerical_steps.append(
+        ("scaler", StandardScaler(with_mean=True, with_std=True))
+    )
+    numerical_transformer = Pipeline(steps=numerical_steps)
+
+    # Build the Preprocessor
     preprocessor = ColumnTransformer(
         transformers= [
-            ("numerical", StandardScaler(), num_columns),
+            ("numerical", numerical_transformer, num_columns),
             ("cateogorical", OneHotEncoder(handle_unknown="ignore",sparse_output=False) , cat_columns),
             ("binary","passthrough", binary_columns)
         ],
@@ -227,7 +254,14 @@ def build_preprocessor(add_tenure=True, add_value_x_service=True, add_full_featu
     preprocessor.set_output(transform="pandas")
     return preprocessor
 
-def build_pipeline(model, add_tenure = True, add_value_x_service = True, add_full_feature = True) :
+def build_pipeline(
+    model,
+    add_tenure = True,
+    add_value_x_service = True,
+    add_full_feature = True,
+    add_power_transform = False,
+    add_remove_nzv = False
+    ) :
     """
     Assemble a full sklearn Pipeline combining feature engineering, preprocessing, and a model.
 
@@ -252,11 +286,12 @@ def build_pipeline(model, add_tenure = True, add_value_x_service = True, add_ful
         ("preprocesing" , build_preprocessor(
             add_tenure           = add_tenure,
             add_value_x_service  = add_value_x_service,
-            add_full_feature_eng = add_full_feature
+            add_full_feature_eng = add_full_feature,
+            add_power_transform  = add_power_transform,
+            add_remove_nzv = add_remove_nzv
         )),
-        ("model" , model)
-        ]
-    )
+        ("model", model)
+    ])
     return pipeline
 
 
