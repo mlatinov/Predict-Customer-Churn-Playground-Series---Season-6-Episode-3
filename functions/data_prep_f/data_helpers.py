@@ -12,18 +12,6 @@ from sklearn.model_selection import train_test_split
 def load_data_sample(url: str, n: int) -> pd.DataFrame:
     """
     Load a random sample of rows from a CSV file for pipeline prototyping.
-
-    Parameters
-    ----------
-    url : str
-        Path or URL to the CSV file.
-    n : int
-        Number of rows to sample.
-
-    Returns
-    -------
-    pd.DataFrame
-        A DataFrame containing n randomly sampled rows (random_state=42 for reproducibility).
     """
     data_sample = pd.read_csv(url).sample(n=n, random_state=42)
     return data_sample
@@ -57,23 +45,6 @@ def data_split(train_url, train_size, test_size) :
 def mutate_payment(data: pd.DataFrame) -> pd.DataFrame:
     """
     Create automatic payment flag and normalize payment method labels.
-
-    Extracts automatic payment information into a binary feature and removes
-    the "(automatic)" suffix from payment method labels for cleaner categorization.
-
-    Parameters
-    ----------
-    data : pd.DataFrame
-        Customer data with PaymentMethod column. Modified in place.
-
-    Returns
-    -------
-    pd.DataFrame
-        The same DataFrame with new 'automatic_payment' column and cleaned PaymentMethod values.
-
-    Notes
-    -----
-    This function modifies the input DataFrame in place.
     """
     # Create binary feature: 1 if payment is automatic, 0 otherwise
     data["automatic_payment"] = data["PaymentMethod"].isin([
@@ -96,19 +67,6 @@ def mutate_payment(data: pd.DataFrame) -> pd.DataFrame:
 def mutate_customer_lifetime_buckets(data: pd.DataFrame) -> pd.DataFrame:
     """
     Categorize customer tenure into meaningful lifecycle buckets.
-
-    Segments customer tenure into 5 distinct buckets representing different
-    lifecycle stages: new, early, established, loyal, and veteran customers.
-
-    Parameters
-    ----------
-    data : pd.DataFrame
-        Customer data with 'tenure' column (in months).
-
-    Returns
-    -------
-    pd.DataFrame
-        DataFrame with new 'customer_lifetime_buckets' ordinal category column.
     """
     # Bin tenure into meaningful customer lifecycle segments
     data["customer_lifetime_buckets"] = pd.cut(
@@ -122,19 +80,6 @@ def mutate_customer_lifetime_buckets(data: pd.DataFrame) -> pd.DataFrame:
 def mutate_new_customer_flag(data: pd.DataFrame) -> pd.DataFrame:
     """
     Create binary flag identifying newly acquired customers.
-
-    Flags customers within their first 6 months as new, useful for analyzing
-    early churn patterns and onboarding effectiveness.
-
-    Parameters
-    ----------
-    data : pd.DataFrame
-        Customer data with 'tenure' column (in months).
-
-    Returns
-    -------
-    pd.DataFrame
-        DataFrame with new 'new_customer_flag' binary column (1 = new customer).
     """
     # Flag customers with 6 months or less tenure as new
     data["new_customer_flag"] = (data["tenure"] <= 6).astype(int)
@@ -147,32 +92,12 @@ def mutate_new_customer_flag(data: pd.DataFrame) -> pd.DataFrame:
 def mutate_value_gap(data: pd.DataFrame) -> pd.DataFrame:
     """
     Calculate pricing discrepancy relative to customer tenure.
-
-    Computes the difference between monthly charges and the average monthly cost
-    implied by total tenure, capturing whether customers are paying more or less
-    than expected based on their tenure length.
-
-    Parameters
-    ----------
-    data : pd.DataFrame
-        Customer data with 'MonthlyCharges' and 'tenure' columns.
-
-    Returns
-    -------
-    pd.DataFrame
-        DataFrame with new 'value_gap' column (pricing signal).
-
-    Notes
-    -----
-    Positive values indicate current charges exceed historical average;
-    negative values indicate customers are paying less than their tenure average.
     """
     # Calculate expected average monthly charge based on tenure
     expected_total = data["MonthlyCharges"] * data["tenure"]
     # Compare current monthly charge against historical average
     data["value_gap"] = data["MonthlyCharges"] - expected_total
     return data
-
 
 # ============================================================================
 # SERVICE RICHNESS SIGNALS
@@ -185,24 +110,6 @@ def mutate_count_services(data: pd.DataFrame) -> pd.DataFrame:
     Aggregates all service subscriptions (phone, internet, security, backup, etc.)
     into a single count metric. Useful for understanding customer engagement
     and service portfolio depth.
-
-    Parameters
-    ----------
-    data : pd.DataFrame
-        Customer data with service columns (PhoneService, InternetService,
-        OnlineSecurity, OnlineBackup, DeviceProtection, TechSupport,
-        StreamingTV, StreamingMovies, MultipleLines).
-
-    Returns
-    -------
-    pd.DataFrame
-        DataFrame with new 'count_services' column containing the total
-        number of services (0-9) for each customer.
-
-    Notes
-    -----
-    Counts any column marked as "Yes" in the services list. Assumes binary
-    Yes/No values in service columns.
     """
     # List of all available services to aggregate
     total_services = [
@@ -222,22 +129,6 @@ def mutate_premium_user_flag(data: pd.DataFrame) -> pd.DataFrame:
     Creates a binary flag for customers subscribed to 7 or more services,
     indicating premium/high-engagement users who likely contribute more
     to revenue and may have different churn patterns.
-
-    Parameters
-    ----------
-    data : pd.DataFrame
-        Customer data with 'count_services' column (typically created by
-        mutate_count_services).
-
-    Returns
-    -------
-    pd.DataFrame
-        DataFrame with new 'premium_user_flag' binary column (1 = premium user).
-
-    Notes
-    -----
-    Requires 'count_services' column to exist. Threshold of 7 services
-    represents subscription to 78%+ of available services.
     """
     # Flag customers with 7+ services as premium users
     data["premium_user_flag"] = (data["count_services"] >= 7).astype(int)
@@ -260,20 +151,6 @@ def mutate_model_clean_data(data) :
 def column_transform(data: pd.DataFrame, column: str, transformation: str) -> pd.DataFrame:
     """
     Transform a column in the DataFrame, used primarily for plotting choices.
-
-    Parameters
-    ----------
-    data : pd.DataFrame
-        The input DataFrame.
-    column : str
-        The column to transform.
-    transformation : str
-        The type of transformation ('log', 'Box-Cox', 'Yeo').
-
-    Returns
-    -------
-    pd.DataFrame
-        The DataFrame with the transformed column.
     """
     data = data.copy()
     if transformation == "log":
