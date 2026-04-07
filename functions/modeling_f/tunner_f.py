@@ -18,7 +18,7 @@ def tunner_random(pipeline, param_grid, X_transformed, y_train_encoded, iters = 
     search.fit(X_transformed, y_train_encoded)
     return search
 
-def tunner_successive_halving(pipeline, param_grid, X_transformed, y_train_encoded,) :
+def tunner_successive_halving(pipeline, param_grid, X_transformed, y_train_encoded,candidates = 100) :
 
     #  Successive halving
     search = HalvingRandomSearchCV(
@@ -27,7 +27,7 @@ def tunner_successive_halving(pipeline, param_grid, X_transformed, y_train_encod
         scoring             = "roc_auc",
         min_resources       = "smallest", 
         factor              = 3,
-        n_candidates        = 100, 
+        n_candidates        = candidates, 
         n_jobs              = 2, 
         random_state        = 42,
         verbose             = 1,
