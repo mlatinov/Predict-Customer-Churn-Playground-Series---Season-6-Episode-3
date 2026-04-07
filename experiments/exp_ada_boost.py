@@ -130,3 +130,20 @@ def exp_ada_boost_tune(
                 input_sample = model_data["x_train"].head(5),
                 registered_model_name = "Tuned Ada Boost Model"
         )
+        # ============ Experimental Settings and Loging  ===============
+        exp_params = {
+            "model"           : "Ada Boost",
+            "model_type"      : "Boosted Trees",
+            "model_params"    : "Tuned",
+            "train_data_size" :  0.7,
+            "test_data_size"  :  0.3,
+            "preprocessing"   : "Yeo + NZV + Scale + One_Hot",
+            "feature_eng"     : "Full"
+        }
+        mlflow.log_params(exp_params)
+        model_params = {
+            "max_depth"             : 1,
+            "learning_rate"         : 0.2,
+            "n_estimators"          : 150 
+        }
+        mlflow.log_model_params(model_params)
