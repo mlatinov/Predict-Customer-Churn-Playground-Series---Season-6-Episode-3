@@ -34,6 +34,9 @@ def exp_ada_boost_tune(
         pipeline = build_pipeline(
             model = AdaBoostClassifier(
                 estimator= DecisionTreeClassifier(max_depth=1)),
+                learning_rate = 0.2,
+                n_estimators  = 150,
+                random_state  = 42, 
             add_tenure          = False,
             add_value_x_service = False,
             add_full_feature    = True,
@@ -79,8 +82,51 @@ def exp_ada_boost_tune(
             X_transformed   = model_data["x_train"],
             y_train_encoded = tunner_df["y_encoded"]
         )
-        search.best_score_
-        search.best_params_
+        # Refit the pipeline with the best parameters 
+        pipeline = search.best_estimator_
 
+        # If DALEX create a dalex explainer 
+        if RUN_DALEX_GLOBAL_EXPLANATIONS or RUN_DALEX_LOCAL_EXPLANATIONS :
+            # Create Dalex Explaier 
+            dx_explainer = dx_create_explainer(
+                pipeline = pipeline,
+                x_train  = model_data["x_train"],
+                y_train  = model_data["y_train"],
+                label    = "Tuned Ada Boosts with DT weak Estenator"
+            )
+            feature_names = ["tenure","MonthlyCharges","TotalCharges","value_gap"]
 
-
+        # =========== DALEX Global Explanations ========================== 
+        if RUN_DALEX_GLOBAL_EXPLANATIONS : 
+            gfi = dx_global_importance(
+                dalex_explainer = dx_explainer,
+                feature_names = feature_names
+            )
+            # Log Global Explanations Plots
+            mlflow_log_dalex_plot(gfi["Loss_Shuffle_Plot"],"variable_importance.html",  "dalex/global")
+            mlflow_log_dalex_plot(gfi["PDP_Plot"]         ,"partial_dependence.html",   "dalex/global")
+            mlflow_log_dalex_plot(gfi["RCDR_Plot"]        ,"residuals_rcdf.html",       "dalex/global")
+        
+        # ============ DALEX Local Explanations ========================
+        if RUN_DALEX_LOCAL_EXPLANATIONS : 
+            lme = dx_local_explanations(
+                dalex_explainer = dx_explainer,
+                pipeline        = pipeline,
+                x_train         = model_data["x_train"],
+                y_train         = model_data["y_train"],
+                features_names  = feature_names
+            )
+            # Log Local Explanations Plots 
+            mlflow_log_dalex_plot(lme["bd_plot_1"]  ,"breakdown_churn.html",      "dalex/local")
+            mlflow_log_dalex_plot(lme["bd_plot_2"]  ,"breakdown_no_churn.html",   "dalex/local")
+            mlflow_log_dalex_plot(lme["cp_plot_1"]  ,"ceretis_paribus_churn.html",      "dalex/local")
+            mlflow_log_dalex_plot(lme["cp_plot_2"]  ,"ceretis_paribus_no_churn.html",   "dalex/local")
+        
+        # Log the model 
+        if LOG_MODEL : 
+            mlflow.sklearn.log_model(
+                sk_model = pipeline,
+                artifact_path = "model",
+                input_sample = model_data["x_train"].head(5),
+                registered_model_name = "Tuned Ada Boost Model"
+        )
