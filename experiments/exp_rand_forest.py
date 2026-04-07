@@ -122,7 +122,9 @@ def exp_random_forest_tune(
         lme = dx_local_explanations(
             dalex_explainer = dx_explainer,
             pipeline        = pipeline,
-            features_names  = features_names
+            x_train = model_data["x_train"],
+            y_train = model_data["y_train"],
+            features_names = features_names
         )
         # Log Local Explanations Plots 
         mlflow_log_dalex_plot(lme["bd_plot_1"]  ,"breakdown_churn.html",      "dalex/local")
