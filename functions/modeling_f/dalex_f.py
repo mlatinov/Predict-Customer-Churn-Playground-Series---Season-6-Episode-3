@@ -4,6 +4,7 @@ import dalex as dx
 import mlflow
 import tempfile
 import os
+import matplotlib.pyplot as plt
 
 def dx_transform(pipeline, x_train, y_train) : 
     """
@@ -113,6 +114,32 @@ def dx_rcdr(dalex_explainer) :
     mp = dalex_explainer.model_performance()
 
     return mp
+
+def dx_residual_analysis(dx_explainer,x_transformed, y_encoded) :
+    """
+    Function to Conpute the and produce plots about the Residuals Distribution from the model 
+    """
+    # Take the model performance 
+    mp      = dx_explainer.model_performance()
+    label   = mp.residuals["label"].iloc[0]
+    results = mp.residuals.copy()
+
+    # Segment by true class
+    churned     = results[results["y"] == 1]
+    not_churned = results[results["y"] == 0]
+
+    # Plot the histogram 
+    fig1, ax = plt.subplots(figsize=(9, 4))
+    ax.hist(not_churned["y_hat"], bins=50, alpha=0.6,
+            label="True No  (0)", color="#378ADD", density=True)
+    ax.hist(churned["y_hat"],     bins=50, alpha=0.6,
+            label="True Yes (1)", color="#D85A30", density=True)
+    ax.axvline(0.5, color="black", linestyle="--", linewidth=1, label="threshold 0.5")
+    ax.set_xlabel("Predicted probability")
+    ax.set_ylabel("Density")
+    ax.set_title(f"Score distribution by true class — {label}")
+    ax.legend()
+    plt.tight_layout()
 
 def dx_global_importance(dalex_explainer, features_names, groups = None) :
     """
@@ -224,7 +251,7 @@ def dx_local_explanations(dalex_explainer, pipeline, features_names, x_train, y_
         "cp_plot_2" : cp["cp_plot_2"]
     }
     return results
-    
+
 def mlflow_log_dalex_plot(dalex_result, filename, artifact_path="dalex"):
     """
     Save a DALEX plot as an interactive HTML artifact and log it to MLflow.
