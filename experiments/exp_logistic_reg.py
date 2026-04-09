@@ -8,7 +8,8 @@ from functions.modeling_f.dalex_f import (
     dx_create_explainer,
     dx_global_importance,
     dx_local_explanations,
-    mlflow_log_dalex_plot
+    mlflow_log_dalex_plot,
+    dx_residual_analysis
 )
 
 def exp_logistic_reg_features(
@@ -106,6 +107,9 @@ def exp_logistic_reg_features(
                 y_train= model_data["y_train"],
                 label= model_to_run
             )
+            # Residual Analysis 
+            residual_analysis = dx_residual_analysis(dx_explainer = dalex_exp)
+            mlflow.log_figure(residual_analysis["fig1"], "residual_distribution.png")
 
         # ======== Global Explations =============
         if RUN_DALEX_GLOBAL_EXPLANATIONS :

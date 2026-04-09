@@ -12,7 +12,8 @@ from functions.modeling_f.dalex_f import (
     dx_global_importance,
     dx_local_explanations,
     mlflow_log_dalex_plot,
-    dx_transform
+    dx_transform,
+    dx_residual_analysis
 )
 
 def exp_ada_boost_tune(
@@ -95,6 +96,10 @@ def exp_ada_boost_tune(
                 label    = "Tuned Ada Boosts with DT weak Estenator"
             )
             feature_names = ["tenure","MonthlyCharges","TotalCharges","value_gap"]
+
+            # Residual Analysis 
+            residual_analysis = dx_residual_analysis(dx_explainer = dx_explainer)
+            mlflow.log_figure(residual_analysis["fig1"], "residual_distribution.png")
 
         # =========== DALEX Global Explanations ========================== 
         if RUN_DALEX_GLOBAL_EXPLANATIONS : 

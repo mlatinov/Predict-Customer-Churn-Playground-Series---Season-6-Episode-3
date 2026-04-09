@@ -115,7 +115,7 @@ def dx_rcdr(dalex_explainer) :
 
     return mp
 
-def dx_residual_analysis(dx_explainer,x_transformed, y_encoded) :
+def dx_residual_analysis(dx_explainer) :
     """
     Function to Conpute the and produce plots about the Residuals Distribution from the model 
     """
@@ -140,6 +140,8 @@ def dx_residual_analysis(dx_explainer,x_transformed, y_encoded) :
     ax.set_title(f"Score distribution by true class — {label}")
     ax.legend()
     plt.tight_layout()
+
+    return fig1
 
 def dx_global_importance(dalex_explainer, features_names, groups = None) :
     """

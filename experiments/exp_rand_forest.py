@@ -11,7 +11,8 @@ from functions.modeling_f.dalex_f import (
     dx_global_importance,
     dx_local_explanations,
     mlflow_log_dalex_plot,
-    dx_transform
+    dx_transform,
+    dx_residual_analysis
 )
 
 def exp_random_forest_tune(
@@ -105,6 +106,9 @@ def exp_random_forest_tune(
             label    = "Tuned Random Forest Model "
         )
         features_names  = ["tenure","MonthlyCharges","TotalCharges","value_gap"]
+        # Residual Analysis 
+        residual_analysis = dx_residual_analysis(dx_explainer = dx_explainer)
+        mlflow.log_figure(residual_analysis["fig1"], "residual_distribution.png")
 
     # ============= Global DALEX Explanations ===================
     if RUN_DALEX_GLOBAL_EXPLANATIONS : 
