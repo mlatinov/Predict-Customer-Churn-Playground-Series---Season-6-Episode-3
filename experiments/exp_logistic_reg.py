@@ -260,7 +260,7 @@ def exp_logistic_reg_preproc(
         if LOG_MODEL :
             mlflow.sklearn.log_model(
                 sk_model = pipeline,
-                artifact_path = "model",
-                input_sample = model_data["x_train"].head(5),
-                registered_model_name = model_to_run
+                name                  = "Logistic Regression",   
+                input_example         = model_data["x_train"].head(5),  
+                registered_model_name = "Logistic Regression"
             )
