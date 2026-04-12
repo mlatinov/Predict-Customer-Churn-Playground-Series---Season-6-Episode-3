@@ -13,7 +13,6 @@ from functions.modeling_f.dalex_f import (
     dx_local_explanations,
     mlflow_log_dalex_plot,
     dx_transform,
-    dx_residual_analysis
 )
 
 def exp_ada_boost_tune(
@@ -34,10 +33,11 @@ def exp_ada_boost_tune(
         # Build Pipeline 
         pipeline = build_pipeline(
             model = AdaBoostClassifier(
-                estimator= DecisionTreeClassifier(max_depth=1)),
+                estimator= DecisionTreeClassifier(max_depth=1),
                 learning_rate = 0.2,
                 n_estimators  = 150,
-                random_state  = 42, 
+                random_state  = 42
+            ),
             add_tenure          = False,
             add_value_x_service = False,
             add_full_feature    = True,
@@ -62,30 +62,29 @@ def exp_ada_boost_tune(
         mlflow.log_metrics(eval)
         mlflow.log_figure(conf_matrix, "plots/confusion_matrix.png")
 
-    # =========== Tune the Ada Boost Model =========================================
-    if RUN_ada_boost_tune : 
-        # Create a parameter grid 
-        param_grid = {
-            'model__n_estimators'        : randint(50, 300),
-            'model__learning_rate'       : uniform(0.01, 0.2),
-            'model__estimator__max_depth': [1, 2, 3], 
-        }
-        # Prepare the data for the Tuner 
-        tunner_df = dx_transform(
-            pipeline = pipeline,
-            x_train  = model_data["x_train"],
-            y_train  = model_data["y_train"]  
-        )
-        # Tune Search with Successive Halving
-        search = tunner_successive_halving(
-            pipeline        = pipeline,
-            param_grid      = param_grid,
-            X_transformed   = model_data["x_train"],
-            y_train_encoded = tunner_df["y_encoded"]
-        )
-        # Refit the pipeline with the best parameters 
-        pipeline = search.best_estimator_
-
+        # =========== Tune the Ada Boost Model =========================================
+        if RUN_ada_boost_tune : 
+            # Create a parameter grid 
+            param_grid = {
+                'model__n_estimators'        : randint(50, 300),
+                'model__learning_rate'       : uniform(0.01, 0.2),
+                'model__estimator__max_depth': [1, 2, 3], 
+            }
+            # Prepare the data for the Tuner 
+            tunner_df = dx_transform(
+                pipeline = pipeline,
+                x_train  = model_data["x_train"],
+                y_train  = model_data["y_train"]  
+            )
+            # Tune Search with Successive Halving
+            search = tunner_successive_halving(
+                pipeline        = pipeline,
+                param_grid      = param_grid,
+                X_transformed   = model_data["x_train"],
+                y_train_encoded = tunner_df["y_encoded"]
+            )
+            # Refit the pipeline with the best parameters 
+            pipeline = search.best_estimator_
         # If DALEX create a dalex explainer 
         if RUN_DALEX_GLOBAL_EXPLANATIONS or RUN_DALEX_LOCAL_EXPLANATIONS :
             # Create Dalex Explaier 
@@ -97,15 +96,11 @@ def exp_ada_boost_tune(
             )
             feature_names = ["tenure","MonthlyCharges","TotalCharges","value_gap"]
 
-            # Residual Analysis 
-            residual_analysis = dx_residual_analysis(dx_explainer = dx_explainer)
-            mlflow.log_figure(residual_analysis["fig1"], "residual_distribution.png")
-
         # =========== DALEX Global Explanations ========================== 
         if RUN_DALEX_GLOBAL_EXPLANATIONS : 
             gfi = dx_global_importance(
                 dalex_explainer = dx_explainer,
-                feature_names = feature_names
+                features_names = feature_names
             )
             # Log Global Explanations Plots
             mlflow_log_dalex_plot(gfi["Loss_Shuffle_Plot"],"variable_importance.html",  "dalex/global")
@@ -131,10 +126,11 @@ def exp_ada_boost_tune(
         if LOG_MODEL : 
             mlflow.sklearn.log_model(
                 sk_model = pipeline,
-                artifact_path = "model",
-                input_sample = model_data["x_train"].head(5),
-                registered_model_name = "Tuned Ada Boost Model"
-        )
+                name                  = "Ada Boost",   
+                input_example         = model_data["x_train"].head(5),  
+                registered_model_name = "Ada Boost"
+            )
+
         # ============ Experimental Settings and Loging  ===============
         exp_params = {
             "model"           : "Ada Boost",
@@ -151,4 +147,4 @@ def exp_ada_boost_tune(
             "learning_rate"         : 0.2,
             "n_estimators"          : 150 
         }
-        mlflow.log_model_params(model_params)
+        mlflow.log_params(model_params)
