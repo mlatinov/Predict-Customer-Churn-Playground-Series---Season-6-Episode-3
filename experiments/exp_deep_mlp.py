@@ -41,7 +41,7 @@ def exp_deep_mlp(
             epochs = 100,
             callbacks = [tf.keras.callbacks.EarlyStopping(
                 monitor  = "val_loss",
-                patience = 10,
+                patience = 5,
                 restore_best_weights = True,
             )],
             validation_split = 0.2
@@ -114,10 +114,6 @@ def exp_deep_mlp(
             )
             feature_names = ["tenure","MonthlyCharges","TotalCharges","value_gap"]
 
-            # Residual Analysis 
-            residual_analysis = dx_residual_analysis(dx_explainer = dx_explainer)
-            mlflow.log_figure(residual_analysis["fig1"], "residual_distribution.png")
-
         # =========== Run Dalex Global Explanations =====================
         if RUN_DALEX_GLOBAL_EXPLANATIONS :
             gfi = dx_global_importance(
@@ -134,7 +130,7 @@ def exp_deep_mlp(
             lme = dx_local_explanations(
                 dalex_explainer = dx_explainer,
                 pipeline        = pipeline,
-                feature_names   = feature_names,
+                features_names  = feature_names,
                 x_train         = model_data["x_train"],
                 y_train         = model_data["y_train"]
             )
@@ -148,9 +144,9 @@ def exp_deep_mlp(
         if RUN_LOG_MODEL :
             mlflow.sklearn.log_model(
                 sk_model = pipeline,
-                artifact_path = "model",
-                input_sample = model_data["x_train"].head(5),
-                registered_model_name = "Tuned Deep MLP Model"
+                name                  = "Deep MLP",   
+                input_example         = model_data["x_train"].head(5),  
+                registered_model_name = "Deep MLP"
         )
 
         # ========= Experimental Settings ================
@@ -174,5 +170,5 @@ def exp_deep_mlp(
             "dropout_rate"   : 0.15,
             "activation"     : "elu"
         }
-        mlflow.log_model_params(model_params)
+        mlflow.log_params(model_params)
 
