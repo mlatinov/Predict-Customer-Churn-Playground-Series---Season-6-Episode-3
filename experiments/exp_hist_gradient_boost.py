@@ -99,10 +99,6 @@ def exp_hist_gradient_tune(
             )
             feature_names = ["tenure","MonthlyCharges","TotalCharges","value_gap"]
 
-            # Residual Analysis 
-            residual_analysis = dx_residual_analysis(dx_explainer = dx_explainer)
-            mlflow.log_figure(residual_analysis["fig1"], "residual_distribution.png")
-
         # =========== Run Dalex Global Explanations =====================
         if RUN_DALEX_GLOBAL_EXPLANATIONS :
             gfi = dx_global_importance(
@@ -119,7 +115,7 @@ def exp_hist_gradient_tune(
             lme = dx_local_explanations(
                 dalex_explainer = dx_explainer,
                 pipeline        = pipeline,
-                feature_names   = feature_names,
+                features_names  = feature_names,
                 x_train         = model_data["x_train"],
                 y_train         = model_data["y_train"]
             )
@@ -133,9 +129,9 @@ def exp_hist_gradient_tune(
         if RUN_LOG_MODEL :
             mlflow.sklearn.log_model(
                 sk_model = pipeline,
-                artifact_path = "model",
-                input_sample = model_data["x_train"].head(5),
-                registered_model_name = "Tuned Ada Boost Model"
+                name                  = "Hist Boost",   
+                input_example         = model_data["x_train"].head(5),  
+                registered_model_name = "Hist Boost"
         )
 
         # ========= Experimental Settings ================
@@ -156,5 +152,5 @@ def exp_hist_gradient_tune(
             "min_samples_leaf" : 18,
             "class_weight"     : "None"
         }
-        mlflow.log_model_params(model_params)
+        mlflow.log_params(model_params)
 
