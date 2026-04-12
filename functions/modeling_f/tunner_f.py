@@ -98,7 +98,7 @@ def deep_mlp_objective(trial, X_train, y_train):
         trial.suggest_int(f"units_layer_{i}", 128, 256, step = 32)
         for i in range(n_layers)
         ]
-        # Other Hyperparams 
+    # Other Hyperparams 
     dropout_rate  = trial.suggest_float("dropout_rate",  0.1,  0.5)
     learning_rate = trial.suggest_float("learning_rate", 1e-4, 1e-2, log=True)
     activation    = trial.suggest_categorical("activation", ["relu", "elu"])
